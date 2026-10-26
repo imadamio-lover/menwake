@@ -89,10 +89,10 @@ def sort_by_grade_order(df_subset):
 # ==========================================
 # 1. 名前のリスト (メンバーリスト)
 # ==========================================
-st.subheader("📋 メンバーリスト（マスターデータ）")
+st.subheader("📋 メンバーリスト")
 
 # ボタンによるランク上下移動コントロール
-with st.expander("↕️ メンバーの順位（ランク）をボタンで変更する", expanded=False):
+with st.expander("↕️ メンバーの順位をボタンで変更する", expanded=False):
     col_sel, col_up, col_down = st.columns([2, 1, 1])
     current_df = st.session_state.members_df.sort_values("シングルスランク").reset_index(drop=True)
     member_names = current_df["名前"].tolist()
@@ -140,7 +140,7 @@ all_member_grade_sorted_names = sort_by_grade_order(edited_df.dropna(subset=["�
 # ==========================================
 st.markdown("---")
 absent_members = st.multiselect(
-    "🏖️ 本日の【欠席者】を選択してください（学年順）",
+    "🏖️ 本日の【欠席者】を選択",
     options=all_member_grade_sorted_names,
     default=[],
     help="選択された人は今回の面分けから除外されます"
@@ -160,11 +160,11 @@ st.subheader("⚡ 練習モード＆条件設定")
 
 practice_mode = st.radio(
     "練習の種類を選択してください",
-    options=["水曜練（同会場 2コート）", "土曜練（大泉・杉本）"],
+    options=["水曜練", "土曜練"],
     index=0
 )
 
-if practice_mode == "土曜練（大泉・杉本）":
+if practice_mode == "土曜練":
     court_name_a = "大泉"
     court_name_b = "杉本"
 else:
@@ -177,8 +177,8 @@ avoid_duplicates = st.checkbox("🔄 全練習（水・土）の過去履歴と�
 # 4. コートを指定する人を選ぶ（一括配置指定・学年順）
 # ==========================================
 st.markdown("---")
-st.markdown("📌 **コート固定メンバーの指定（任意・学年順）**")
-st.caption("オーパスカード所持者や、特定コートに割り振りたいメンバーを指定できます。")
+st.markdown("📌 **コート固定メンバーの指定**")
+
 
 col_fixed_a, col_fixed_b = st.columns(2)
 
@@ -228,7 +228,7 @@ def get_combination_penalty(df_a, history, member_grade_map, is_saturday):
 
     # ② 土曜練用：会場（大泉・杉本）の連投・偏りペナルティ
     if is_saturday:
-        sat_history = [h for h in history if h.get("mode") == "土曜練（大泉・杉本）"]
+        sat_history = [h for h in history if h.get("mode") == "土曜練"]
         if sat_history:
             last_sat = sat_history[-1]
             last_oizumi = set(last_sat.get("A_names", []))
@@ -329,7 +329,7 @@ if exec_button:
     
     total_count = len(df_clean)
     target_half = total_count // 2
-    is_sat = practice_mode == "土曜練（大泉・杉本）"
+    is_sat = practice_mode == "土曜練"
     
     if total_count < 6:
         st.error("上位6人均等配置のため、参加者を6名以上確保してください。")
@@ -376,8 +376,7 @@ if exec_button:
                 st.caption(f"内訳: 4年:{counts_b.get('4年',0)} / 3年:{counts_b.get('3年',0)} / 2年:{counts_b.get('2年',0)} / 1年:{counts_b.get('1年',0)}")
 
             st.markdown("---")
-            st.subheader("📝 メンバー一覧（指定優先順）")
-            st.caption("※ 指定された優先順位（井上・岩田・長瀬...）に並べ替えたテキスト一覧です。")
+            st.subheader("📝 メンバー一覧")
 
             sorted_a_names = sort_by_custom_order(names_a)
             sorted_b_names = sort_by_custom_order(names_b)
