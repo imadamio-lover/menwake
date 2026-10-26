@@ -67,7 +67,7 @@ if "members_df" not in st.session_state:
     calculated_data = []
     for item in raw_default_data:
         calculated_data.append({
-            "シングルスランク": item["シングルスランク"],
+            "ランキング": item["シングルスランク"],
             "名前": item["名前"],
             "学年": calculate_current_grade(item["base_grade"])
         })
@@ -80,10 +80,10 @@ def sort_by_custom_order(names_list):
 # ==========================================
 # 1. 名前のリスト (メンバーリスト)
 # ==========================================
-st.subheader("📋 メンバーリスト（マスターデータ）")
+st.subheader("📋 メンバーリスト")
 
 # ボタンによるランク上下移動コントロール
-with st.expander("↕️ メンバーの順位（ランク）をボタンで変更する", expanded=False):
+with st.expander("↕️ メンバーの順位をボタンで変更する", expanded=False):
     col_sel, col_up, col_down = st.columns([2, 1, 1])
     current_df = st.session_state.members_df.sort_values("シングルスランク").reset_index(drop=True)
     member_names = current_df["名前"].tolist()
