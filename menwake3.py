@@ -67,7 +67,7 @@ if "members_df" not in st.session_state:
     calculated_data = []
     for item in raw_default_data:
         calculated_data.append({
-            "ランキング": item["シングルスランク"],
+            "シングルスランク": item["シングルスランク"],
             "名前": item["名前"],
             "学年": calculate_current_grade(item["base_grade"])
         })
