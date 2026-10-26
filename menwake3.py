@@ -25,7 +25,7 @@ CUSTOM_ORDER = [
 order_map = {name: i for i, name in enumerate(CUSTOM_ORDER)}
 
 # --- 日付連動：学年自動繰り上げ計算関数 ---
-BASE_YEAR = 2025
+BASE_YEAR = 2026
 
 def calculate_current_grade(base_grade_num):
     current_year = datetime.now().year
