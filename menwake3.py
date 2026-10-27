@@ -16,16 +16,13 @@ def get_shared_history():
 
 shared_history = get_shared_history()
 
-# --- カスタム優先順位の定義 ---
+# --- カスタム優先順位の定義（選択肢の並び順にも適用） ---
 CUSTOM_ORDER = [
     "井上", "岩田", "長瀬", "宮井", "横田", "池田", "植田", "坂本",
     "比嘉", "藤吉", "松下", "池内", "木下", "清水", "髙木", "高木",
     "大平", "尾形", "洪", "小坂", "呉", "野津", "平賀"
 ]
 order_map = {name: i for i, name in enumerate(CUSTOM_ORDER)}
-
-# 学年ソート用マップ（4年 -> 3年 -> 2年 -> 1年 の順）
-GRADE_ORDER_MAP = {"4年": 1, "3年": 2, "2年": 3, "1年": 4}
 
 # --- 日付連動：学年自動繰り上げ計算関数（2026年基準・毎年1月1日繰り上げ） ---
 BASE_YEAR = 2026  # 2026年を基準年に設定（2026年中は元の学年を表示）
@@ -77,22 +74,16 @@ for item in raw_default_data:
 st.session_state.members_df = pd.DataFrame(calculated_data)
 
 def sort_by_custom_order(names_list):
+    """指定の優先順位（井上、岩田、長瀬...）で並べ替え"""
     return sorted(names_list, key=lambda x: order_map.get(x, 999))
-
-def sort_by_grade_order(df_subset):
-    """メンバーリストを学年順（4年→3年→2年→1年）、同順内はランク順で並べ替え"""
-    df_copy = df_subset.copy()
-    df_copy["grade_rank"] = df_copy["学年"].map(GRADE_ORDER_MAP).fillna(99)
-    df_sorted = df_copy.sort_values(["grade_rank", "シングルスランク"])
-    return df_sorted["名前"].tolist()
 
 # ==========================================
 # 1. 名前のリスト (メンバーリスト)
 # ==========================================
-st.subheader("📋 メンバーリスト")
+st.subheader("📋 メンバーリスト（マスターデータ）")
 
 # ボタンによるランク上下移動コントロール
-with st.expander("↕️ メンバーの順位をボタンで変更する", expanded=False):
+with st.expander("↕️ メンバーの順位（ランク）をボタンで変更する", expanded=False):
     col_sel, col_up, col_down = st.columns([2, 1, 1])
     current_df = st.session_state.members_df.sort_values("シングルスランク").reset_index(drop=True)
     member_names = current_df["名前"].tolist()
@@ -132,25 +123,22 @@ edited_df = st.data_editor(
 
 st.session_state.members_df = edited_df
 
-# 全メンバー名を学年順（4年→3年→2年→1年）で取得
-all_member_grade_sorted_names = sort_by_grade_order(edited_df.dropna(subset=["名前"]))
+# 全メンバー名を指定優先順（井上、岩田、長瀬...）で並べ替え
+all_member_names_sorted = sort_by_custom_order(edited_df.dropna(subset=["名前"])["名前"].tolist())
 
 # ==========================================
-# 2. 欠席者の選択（学年順）
+# 2. 欠席者の選択（指定優先順）
 # ==========================================
 st.markdown("---")
 absent_members = st.multiselect(
-    "🏖️ 本日の【欠席者】を選択",
-    options=all_member_grade_sorted_names,
+    "🏖️ 本日の【欠席者】を選択してください",
+    options=all_member_names_sorted,
     default=[],
     help="選択された人は今回の面分けから除外されます"
 )
 
-# 欠席者を除いた参加可能メンバー（DataFrame）
-attending_df = edited_df[~edited_df["名前"].isin(absent_members)].copy()
-
-# コート固定選択用の学年順（4年→3年→2年→1年）リスト作成
-attending_grade_sorted_names = sort_by_grade_order(attending_df)
+# 欠席者を除いた参加可能メンバー（指定優先順）
+attending_members_sorted = [m for m in all_member_names_sorted if m not in absent_members]
 
 # ==========================================
 # 3. 練習モードの選択
@@ -160,11 +148,11 @@ st.subheader("⚡ 練習モード＆条件設定")
 
 practice_mode = st.radio(
     "練習の種類を選択してください",
-    options=["水曜練", "土曜練"],
+    options=["水曜練（同会場 2コート）", "土曜練（大泉・杉本）"],
     index=0
 )
 
-if practice_mode == "土曜練":
+if practice_mode == "土曜練（大泉・杉本）":
     court_name_a = "大泉"
     court_name_b = "杉本"
 else:
@@ -174,24 +162,24 @@ else:
 avoid_duplicates = st.checkbox("🔄 全練習（水・土）の過去履歴と被り・会場偏りを最小化する", value=True)
 
 # ==========================================
-# 4. コートを指定する人を選ぶ（一括配置指定・学年順）
+# 4. コートを指定する人を選ぶ（一括配置指定・指定優先順）
 # ==========================================
 st.markdown("---")
-st.markdown("📌 **コート固定メンバーの指定**")
-
+st.markdown("📌 **コート固定メンバーの指定（任意）**")
+st.caption("オーパスカード所持者や、特定コートに割り振りたいメンバーを指定できます。")
 
 col_fixed_a, col_fixed_b = st.columns(2)
 
 with col_fixed_a:
     fixed_a_members = st.multiselect(
         f"📍 【{court_name_a}】に固定する人",
-        options=attending_grade_sorted_names,
+        options=attending_members_sorted,
         default=[],
         help=f"選択した人は必ず{court_name_a}に配置されます（オーパス所有者など）"
     )
 
-# Aに選ばれた人以外を学年順でBの選択肢にする
-b_options = [m for m in attending_grade_sorted_names if m not in fixed_a_members]
+# Aに選ばれた人以外を指定優先順でBの選択肢にする
+b_options = [m for m in attending_members_sorted if m not in fixed_a_members]
 
 with col_fixed_b:
     fixed_b_members = st.multiselect(
@@ -228,7 +216,7 @@ def get_combination_penalty(df_a, history, member_grade_map, is_saturday):
 
     # ② 土曜練用：会場（大泉・杉本）の連投・偏りペナルティ
     if is_saturday:
-        sat_history = [h for h in history if h.get("mode") == "土曜練"]
+        sat_history = [h for h in history if h.get("mode") == "土曜練（大泉・杉本）"]
         if sat_history:
             last_sat = sat_history[-1]
             last_oizumi = set(last_sat.get("A_names", []))
@@ -238,10 +226,14 @@ def get_combination_penalty(df_a, history, member_grade_map, is_saturday):
 
     return penalty
 
-# --- 面分けアルゴリズム ---
+# --- 面分けアルゴリズム（奇数人数・人数不均等対応） ---
 def divide_courts(df, history, avoid_dup, fixed_a, fixed_b, is_saturday):
     df_sorted = df.sort_values("シングルスランク").reset_index(drop=True)
-    target_per_court = len(df_sorted) // 2
+    total_len = len(df_sorted)
+    
+    # 人数配分目標（奇数の場合は差が1人以内になるよう許容）
+    target_a_base = total_len // 2
+    target_b_base = total_len - target_a_base
     
     member_grade_map = dict(zip(df_sorted["名前"], df_sorted["学年"]))
     
@@ -249,7 +241,7 @@ def divide_courts(df, history, avoid_dup, fixed_a, fixed_b, is_saturday):
     best_df_b = pd.DataFrame()
     lowest_penalty = float('inf')
     
-    for _ in range(3500):
+    for _ in range(4000):
         court_a = []
         court_b = []
         
@@ -266,7 +258,8 @@ def divide_courts(df, history, avoid_dup, fixed_a, fixed_b, is_saturday):
             court_a.extend(g_members[:half])
             court_b.extend(g_members[half:])
             
-        if len(court_a) != target_per_court or len(court_b) != target_per_court:
+        # 人数差が1人を超える分配（例: 2人以上の偏り）は弾く
+        if abs(len(court_a) - len(court_b)) > 1:
             continue
             
         df_a = pd.DataFrame(court_a)
@@ -281,10 +274,13 @@ def divide_courts(df, history, avoid_dup, fixed_a, fixed_b, is_saturday):
         if fixed_b and not all(m in names_b for m in fixed_b):
             continue
         
-        # 優先順位②: 上位6名の均等配分（各コート3名ずつ）
-        top6_names = set(df_sorted.iloc[:6]["名前"].tolist())
+        # 優先順位②: 上位6名の均等配分（各コート3名ずつ、上位6名未満ならそのまま分ける）
+        top6_count = min(6, total_len)
+        top6_names = set(df_sorted.iloc[:top6_count]["名前"].tolist())
         a_top6_count = len([m for m in df_a["名前"] if m in top6_names])
-        if a_top6_count != 3:
+        target_top6_a = top6_count // 2
+        
+        if abs(a_top6_count - target_top6_a) > 1:
             continue
             
         # 優先順位⑤: 平均ランクの極端な乖離防止
@@ -328,17 +324,15 @@ if exec_button:
     df_clean = df_clean[~df_clean["名前"].isin(absent_members)]
     
     total_count = len(df_clean)
-    target_half = total_count // 2
-    is_sat = practice_mode == "土曜練"
+    max_court_capacity = (total_count + 1) // 2  # 奇数の場合の多い方の定員（例: 15人なら8人）
+    is_sat = practice_mode == "土曜練（大泉・杉本）"
     
-    if total_count < 6:
-        st.error("上位6人均等配置のため、参加者を6名以上確保してください。")
-    elif total_count % 2 != 0:
-        st.error(f"両コートの人数を均等にするため、参加者を偶数名にしてください。（現在の参加人数: {total_count}名）")
-    elif len(fixed_a_members) > target_half:
-        st.error(f"【{court_name_a}】に固定された人数（{len(fixed_a_members)}名）が、1コートの定員（{target_half}名）を超えています。")
-    elif len(fixed_b_members) > target_half:
-        st.error(f"【{court_name_b}】に固定された人数（{len(fixed_b_members)}名）が、1コートの定員（{target_half}名）を超えています。")
+    if total_count < 2:
+        st.error("面分けを行うため、参加者を2名以上確保してください。")
+    elif len(fixed_a_members) > max_court_capacity:
+        st.error(f"【{court_name_a}】に固定された人数（{len(fixed_a_members)}名）が、コートの許容定員（{max_court_capacity}名）を超えています。")
+    elif len(fixed_b_members) > max_court_capacity:
+        st.error(f"【{court_name_b}】に固定された人数（{len(fixed_b_members)}名）が、コートの許容定員（{max_court_capacity}名）を超えています。")
     else:
         df_a, df_b, penalty = divide_courts(df_clean, shared_history, avoid_duplicates, fixed_a_members, fixed_b_members, is_sat)
         
@@ -359,7 +353,8 @@ if exec_button:
                 "B_names": names_b
             })
             
-            st.success(f"✨ 条件の優先順位（会場の偏り防止含む）を適用して作成しました！（参加: {total_count}名）")
+            odd_msg = "（※奇数名のため 1名差で振り分け）" if total_count % 2 != 0 else ""
+            st.success(f"✨ 条件の優先順位を適用して作成しました！（本日の参加: {total_count}名{odd_msg}）")
             
             col1, col2 = st.columns(2)
             
@@ -376,7 +371,8 @@ if exec_button:
                 st.caption(f"内訳: 4年:{counts_b.get('4年',0)} / 3年:{counts_b.get('3年',0)} / 2年:{counts_b.get('2年',0)} / 1年:{counts_b.get('1年',0)}")
 
             st.markdown("---")
-            st.subheader("📝 メンバー一覧")
+            st.subheader("📝 メンバー一覧（指定優先順）")
+            st.caption("※ 指定された優先順位（井上・岩田・長瀬...）に並べ替えたテキスト一覧です。")
 
             sorted_a_names = sort_by_custom_order(names_a)
             sorted_b_names = sort_by_custom_order(names_b)
